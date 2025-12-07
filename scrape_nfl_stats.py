@@ -62,7 +62,27 @@ def scrape_nfl_team_scoring():
                 continue
             
             # Extract team name (usually in first column)
-            team_name = cells[0].get_text(strip=True) if cells else None
+            # NFL.com often has nested elements, get only direct text or first occurrence
+            if cells:
+                team_cell = cells[0]
+                # Try to find a link or span with team name first
+                team_link = team_cell.find('a')
+                if team_link:
+                    team_name = team_link.get_text(strip=True)
+                else:
+                    # Get text and remove duplicates if they exist
+                    team_text = team_cell.get_text(strip=True)
+                    # Check if team name is duplicated (e.g., "BillsBills")
+                    if len(team_text) > 0 and len(team_text) % 2 == 0:
+                        half_len = len(team_text) // 2
+                        if team_text[:half_len] == team_text[half_len:]:
+                            team_name = team_text[:half_len]
+                        else:
+                            team_name = team_text
+                    else:
+                        team_name = team_text
+            else:
+                team_name = None
             
             # Extract the required statistics
             row_data = {'Team': team_name}

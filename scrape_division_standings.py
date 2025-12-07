@@ -68,19 +68,40 @@ def scrape_league_standings():
                 # Get text and clean it
                 team_text = team_cell.get_text(strip=True)
                 
-                # Handle duplicated team name suffix (e.g., "BrownsBrowns" -> "Browns")
+                # Extract team name from the last word, handling corrupted suffixes
                 words = team_text.split()
                 last_word = words[-1] if words else ""
                 
-                # Check if the last word is duplicated
-                if len(last_word) > 0 and len(last_word) % 2 == 0:
-                    half_len = len(last_word) // 2
-                    if last_word[:half_len] == last_word[half_len:]:
-                        # Replace duplicated word with single version
-                        team_text = ' '.join(words[:-1] + [last_word[:half_len]])
-                
-                # Extract just the team name (last word) for matching with scoring table
-                team_name = team_text.split()[-1] if team_text else None
+                if last_word:
+                    # Find the team name: start from first uppercase, continue collecting letters
+                    # Stop when we encounter a sequence that looks like corruption (lowercase after the team name)
+                    team_name = ""
+                    for j, char in enumerate(last_word):
+                        if char.isupper():
+                            if not team_name:
+                                # Starting the team name
+                                team_name = char
+                            else:
+                                # Add uppercase letters
+                                team_name += char
+                        elif char.isalpha() and team_name:
+                            # Add lowercase only if it's right after uppercase (like "McD" in McDonald)
+                            # or if we've been building the name
+                            if len(team_name) > 0:
+                                team_name += char
+                        elif not char.isalpha() and team_name:
+                            # Hit non-letter, stop building
+                            break
+                    
+                    # Handle duplicated names like "BrownsBrowns" where the entire name appears twice
+                    if team_name and len(team_name) > 2:
+                        # Check if it's a duplication (even length and first half = second half)
+                        if len(team_name) % 2 == 0:
+                            half_len = len(team_name) // 2
+                            if team_name[:half_len].lower() == team_name[half_len:].lower():
+                                team_name = team_name[:half_len]
+                else:
+                    team_name = None
             else:
                 team_name = None
             
@@ -109,6 +130,10 @@ def scrape_league_standings():
         conn = sqlite3.connect('NFL_Stats.db')
         cursor = conn.cursor()
         
+        # Get list of teams from the scoring table for matching
+        cursor.execute('SELECT id, Team FROM team_scoring_2024 ORDER BY Team')
+        db_teams = {row[1].lower(): row[0] for row in cursor.fetchall()}
+        
         # Create standings table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS league_standings_2024 (
@@ -128,13 +153,22 @@ def scrape_league_standings():
         # Insert data with team_id lookup
         inserted_count = 0
         for data in standings_data:
-            # Look up team_id from team_scoring_2024 table
+            # Look up team_id from team_scoring_2024 table using fuzzy matching
             team_name = data.get('NFL_Team', '')
-            cursor.execute('SELECT id FROM team_scoring_2024 WHERE Team = ?', (team_name,))
-            result = cursor.fetchone()
             
-            if result:
-                team_id = result[0]
+            # Try exact match first (case-insensitive)
+            team_id = db_teams.get(team_name.lower())
+            
+            # If no exact match, try to find it by checking if it's a substring or contains team name
+            if not team_id:
+                for db_team_name, tid in db_teams.items():
+                    # Check if the extracted team is in the database team name or vice versa
+                    if db_team_name in team_name.lower() or team_name.lower() in db_team_name:
+                        team_id = tid
+                        team_name = db_team_name.title()
+                        break
+            
+            if team_id:
                 cursor.execute('''
                     INSERT INTO league_standings_2024 (team_id, NFL_Team, W, L, T)
                     VALUES (?, ?, ?, ?, ?)

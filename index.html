@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2024 NFL Team Scoring Analytics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        label {
+            font-weight: 600;
+            color: #444;
+            font-size: 1.1em;
+        }
+
+        select {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            min-width: 200px;
+            transition: all 0.3s ease;
+        }
+
+        select:hover {
+            border-color: #764ba2;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 500px;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .stat-card .value {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #dc3545;
+            font-size: 1.1em;
+        }
+
+        canvas {
+            max-height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏈 NFL Team Scoring Analytics</h1>
+        <p class="subtitle">2024 Regular Season Statistics</p>
+        
+        <div class="controls">
+            <label for="teamSelect">Select Team:</label>
+            <select id="teamSelect">
+                <option value="">-- Choose a Team --</option>
+            </select>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="scoringChart"></canvas>
+        </div>
+
+        <div class="stats-summary" id="statsSummary"></div>
+    </div>
+
+    <script>
+        let teamsData = [];
+        let chart = null;
+
+        // Load and parse CSV data
+        async function loadCSVData() {
+            try {
+                const response = await fetch('2024_Team_Scoring_Standings.csv');
+                const csvText = await response.text();
+                
+                const lines = csvText.trim().split('\n');
+                const headers = lines[0].split(',');
+                
+                teamsData = lines.slice(1).map(line => {
+                    const values = line.split(',');
+                    return {
+                        team: values[0],
+                        rushingTouchdowns: parseInt(values[1]),
+                        receivingTouchdowns: parseInt(values[2]),
+                        totalTouchdowns: parseInt(values[3]),
+                        twoPointConversions: parseInt(values[4]),
+                        wins: parseInt(values[5]),
+                        losses: parseInt(values[6]),
+                        ties: parseInt(values[7])
+                    };
+                });
+
+                populateTeamDropdown();
+            } catch (error) {
+                console.error('Error loading CSV:', error);
+                document.querySelector('.chart-container').innerHTML = 
+                    '<div class="error">Error loading data. Please ensure 2024_Team_Scoring_Standings.csv is in the same directory.</div>';
+            }
+        }
+
+        // Populate the team dropdown
+        function populateTeamDropdown() {
+            const select = document.getElementById('teamSelect');
+            teamsData.forEach(team => {
+                const option = document.createElement('option');
+                option.value = team.team;
+                option.textContent = team.team;
+                select.appendChild(option);
+            });
+
+            select.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    displayTeamData(e.target.value);
+                }
+            });
+        }
+
+        // Display selected team data
+        function displayTeamData(teamName) {
+            const teamData = teamsData.find(t => t.team === teamName);
+            if (!teamData) return;
+
+            // Update chart
+            updateChart(teamData);
+
+            // Update stats summary
+            updateStatsSummary(teamData);
+        }
+
+        // Create/Update chart
+        function updateChart(teamData) {
+            const canvas = document.getElementById('scoringChart');
+            const ctx = canvas.getContext('2d');
+
+            // Clear previous chart
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Set canvas size
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 450;
+
+            const data = [
+                { label: 'Rushing TDs', value: teamData.rushingTouchdowns, color: '#667eea' },
+                { label: 'Receiving TDs', value: teamData.receivingTouchdowns, color: '#764ba2' },
+                { label: 'Total TDs', value: teamData.totalTouchdowns, color: '#f093fb' },
+                { label: '2-PT Conversions', value: teamData.twoPointConversions, color: '#4facfe' }
+            ];
+
+            drawBarChart(ctx, canvas, data, teamData.team);
+        }
+
+        // Draw bar chart
+        function drawBarChart(ctx, canvas, data, teamName) {
+            const padding = 60;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 2;
+            const barWidth = chartWidth / (data.length * 2);
+            const maxValue = Math.max(...data.map(d => d.value));
+
+            // Draw title
+            ctx.font = 'bold 24px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${teamName} - Scoring Statistics`, canvas.width / 2, 30);
+
+            // Draw axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+
+            // Draw bars
+            data.forEach((item, index) => {
+                const barHeight = (item.value / maxValue) * chartHeight * 0.9;
+                const x = padding + (index * 2 + 0.5) * barWidth;
+                const y = canvas.height - padding - barHeight;
+
+                // Draw bar
+                ctx.fillStyle = item.color;
+                ctx.fillRect(x, y, barWidth * 1.5, barHeight);
+
+                // Draw value on top of bar
+                ctx.font = 'bold 16px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText(item.value, x + barWidth * 0.75, y - 5);
+
+                // Draw label
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#666';
+                ctx.save();
+                ctx.translate(x + barWidth * 0.75, canvas.height - padding + 15);
+                ctx.rotate(-Math.PI / 6);
+                ctx.textAlign = 'right';
+                ctx.fillText(item.label, 0, 0);
+                ctx.restore();
+            });
+
+            // Draw Y-axis labels
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#666';
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxValue / 5) * i);
+                const y = canvas.height - padding - (chartHeight * 0.9 * i / 5);
+                ctx.fillText(value, padding - 10, y + 4);
+                
+                // Grid lines
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+            }
+        }
+
+        // Update stats summary cards
+        function updateStatsSummary(teamData) {
+            const summaryDiv = document.getElementById('statsSummary');
+            summaryDiv.innerHTML = `
+                <div class="stat-card">
+                    <h3>Rushing Touchdowns</h3>
+                    <div class="value">${teamData.rushingTouchdowns}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Receiving Touchdowns</h3>
+                    <div class="value">${teamData.receivingTouchdowns}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Touchdowns</h3>
+                    <div class="value">${teamData.totalTouchdowns}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Two Point Conversions</h3>
+                    <div class="value">${teamData.twoPointConversions}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Season Record</h3>
+                    <div class="value" style="font-size: 1.8em;">${teamData.wins}-${teamData.losses}-${teamData.ties}</div>
+                </div>
+            `;
+        }
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCSVData();
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const select = document.getElementById('teamSelect');
+            if (select.value) {
+                displayTeamData(select.value);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -19,7 +19,7 @@ select
 from team_scoring_2024 s
 ;
 
-select NFL_Team, W, L, T, Rsh_TD, Rec_TD, Tot_TD, "2-PT"
+select NFL_Team as "Team", W as "Wins", L as "Losses", T as "Ties", Rsh_TD as "Rushing Touchdowns", Rec_TD as "Receiving Touchdowns", Tot_TD as "Total Touchdowns", "2-PT" as "Two Point Conversions"
 from league_standings_2024
 inner join team_scoring_2024
 on league_standings_2024.team_id = team_scoring_2024.id

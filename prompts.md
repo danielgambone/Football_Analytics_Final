@@ -8,3 +8,5 @@ Write another Python function that uses requests and Beautiful Soup to scrape th
 There are only 18 rows or 'teams' in the league_standings_2024 table when there should be 32 from the website. Can you make sure all teams are added to the table (32 rows)?
 
 I would like to create a no frameworks, front end, vanilla javascript, index in the root directory, web application that uses the 2024_Team_Scoring_Standings.csv file as the data. I want the web app to graph the scoring data. Make the team selectable from a user dropdown. For example scoring data: Rushing Touchdowns,Receiving Touchdowns,Total Touchdowns,Two Point Conversions
+
+Update my index.html file to have the Project_Report.md included at the bottom of the landing page as a project description. Convert the markdown file into html.

@@ -218,6 +218,39 @@
         .project-report code {
             font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
         }
+
+        .viz-section {
+            margin-top: 40px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .viz-section h2 {
+            margin-bottom: 15px;
+            color: #333;
+            text-align: center;
+        }
+
+        .comparison-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .quadrant-label {
+            position: absolute;
+            font-size: 11px;
+            color: #666;
+            font-weight: 600;
+            background: rgba(255,255,255,0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>
@@ -237,6 +270,62 @@
         </div>
 
         <div class="stats-summary" id="statsSummary"></div>
+
+        <!-- Offensive Balance Pie Chart -->
+        <section class="viz-section" id="offensiveBalanceSection" style="display: none;">
+            <h2>Offensive Balance: Rushing vs Receiving TDs</h2>
+            <div class="chart-container" style="height: 400px;">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Radar Chart -->
+        <section class="viz-section" id="radarSection" style="display: none;">
+            <h2>Team Profile</h2>
+            <div class="chart-container" style="height: 450px;">
+                <canvas id="radarChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Team Comparison -->
+        <section class="viz-section">
+            <h2>Team Comparison</h2>
+            <div class="comparison-controls">
+                <label for="team1Select">Team 1:</label>
+                <select id="team1Select">
+                    <option value="">-- Choose Team 1 --</option>
+                </select>
+                <label for="team2Select">Team 2:</label>
+                <select id="team2Select">
+                    <option value="">-- Choose Team 2 --</option>
+                </select>
+            </div>
+            <div class="chart-container" style="height: 450px;">
+                <canvas id="comparisonChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Scatter Plot -->
+        <section class="viz-section">
+            <h2>Wins vs Total Touchdowns Correlation</h2>
+            <div class="controls" style="margin-bottom: 15px;">
+                <label for="scatterTeamSelect">Highlight Team:</label>
+                <select id="scatterTeamSelect">
+                    <option value="">-- All Teams --</option>
+                </select>
+            </div>
+            <div class="chart-container" style="height: 500px;">
+                <canvas id="scatterChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Quadrant Chart -->
+        <section class="viz-section">
+            <h2>Team Performance Quadrants</h2>
+            <div class="chart-container" style="height: 500px; position: relative;">
+                <canvas id="quadrantChart"></canvas>
+            </div>
+        </section>
 
         <section class="top10-section">
             <div class="top10-header">
@@ -371,11 +460,682 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
         let top10Data = [];
         let top10Chart = null;
 
+        // Pie Chart - Offensive Balance
+        function renderPieChart(teamData) {
+            const canvas = document.getElementById('pieChart');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 350;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2 - 20;
+            const radius = Math.min(centerX, centerY) - 40;
+
+            const rushing = teamData.rushingTouchdowns;
+            const receiving = teamData.receivingTouchdowns;
+            const total = rushing + receiving;
+
+            if (total === 0) return;
+
+            const rushingAngle = (rushing / total) * 2 * Math.PI;
+            const receivingAngle = (receiving / total) * 2 * Math.PI;
+
+            // Draw rushing slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, 0, rushingAngle);
+            ctx.closePath();
+            ctx.fillStyle = '#667eea';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw receiving slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, rushingAngle, rushingAngle + receivingAngle);
+            ctx.closePath();
+            ctx.fillStyle = '#f093fb';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Labels
+            ctx.font = 'bold 16px Arial';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+
+            const rushingLabelAngle = rushingAngle / 2;
+            const rushingLabelX = centerX + Math.cos(rushingLabelAngle) * (radius * 0.6);
+            const rushingLabelY = centerY + Math.sin(rushingLabelAngle) * (radius * 0.6);
+            ctx.fillText(`${rushing}`, rushingLabelX, rushingLabelY);
+
+            const receivingLabelAngle = rushingAngle + receivingAngle / 2;
+            const receivingLabelX = centerX + Math.cos(receivingLabelAngle) * (radius * 0.6);
+            const receivingLabelY = centerY + Math.sin(receivingLabelAngle) * (radius * 0.6);
+            ctx.fillText(`${receiving}`, receivingLabelX, receivingLabelY);
+
+            // Title
+            ctx.font = 'bold 20px Arial';
+            ctx.fillStyle = '#333';
+            ctx.fillText(`${teamData.team} - TD Breakdown`, centerX, 30);
+
+            // Legend
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#667eea';
+            ctx.fillRect(centerX - 150, canvas.height - 40, 20, 20);
+            ctx.fillStyle = '#333';
+            ctx.fillText(`Rushing TDs: ${rushing} (${(rushing/total*100).toFixed(1)}%)`, centerX - 125, canvas.height - 25);
+
+            ctx.fillStyle = '#f093fb';
+            ctx.fillRect(centerX + 30, canvas.height - 40, 20, 20);
+            ctx.fillStyle = '#333';
+            ctx.fillText(`Receiving TDs: ${receiving} (${(receiving/total*100).toFixed(1)}%)`, centerX + 55, canvas.height - 25);
+        }
+
+        // Radar Chart - Team Profile
+        function renderRadarChart(teamData) {
+            const canvas = document.getElementById('radarChart');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 400;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 80;
+
+            // Normalize data to 0-1 scale
+            const maxWins = Math.max(...teamsData.map(t => t.wins));
+            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
+            const maxRushTDs = Math.max(...teamsData.map(t => t.rushingTouchdowns));
+            const maxRecTDs = Math.max(...teamsData.map(t => t.receivingTouchdowns));
+            const max2PT = Math.max(...teamsData.map(t => t.twoPointConversions));
+
+            const metrics = [
+                { label: 'Wins', value: teamData.wins / maxWins, raw: teamData.wins },
+                { label: 'Total TDs', value: teamData.totalTouchdowns / maxTDs, raw: teamData.totalTouchdowns },
+                { label: 'Rushing TDs', value: teamData.rushingTouchdowns / maxRushTDs, raw: teamData.rushingTouchdowns },
+                { label: 'Receiving TDs', value: teamData.receivingTouchdowns / maxRecTDs, raw: teamData.receivingTouchdowns },
+                { label: '2-PT Conv', value: teamData.twoPointConversions / (max2PT || 1), raw: teamData.twoPointConversions }
+            ];
+
+            const angleStep = (2 * Math.PI) / metrics.length;
+
+            // Draw grid circles
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            for (let i = 1; i <= 5; i++) {
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, (radius / 5) * i, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+
+            // Draw axes
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            metrics.forEach((metric, i) => {
+                const angle = i * angleStep - Math.PI / 2;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+
+                // Labels
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                const labelX = centerX + Math.cos(angle) * (radius + 25);
+                const labelY = centerY + Math.sin(angle) * (radius + 25);
+                ctx.fillText(metric.label, labelX, labelY);
+                ctx.fillText(`(${metric.raw})`, labelX, labelY + 15);
+            });
+
+            // Draw data polygon
+            ctx.beginPath();
+            metrics.forEach((metric, i) => {
+                const angle = i * angleStep - Math.PI / 2;
+                const distance = metric.value * radius;
+                const x = centerX + Math.cos(angle) * distance;
+                const y = centerY + Math.sin(angle) * distance;
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(102, 126, 234, 0.3)';
+            ctx.fill();
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw points
+            metrics.forEach((metric, i) => {
+                const angle = i * angleStep - Math.PI / 2;
+                const distance = metric.value * radius;
+                const x = centerX + Math.cos(angle) * distance;
+                const y = centerY + Math.sin(angle) * distance;
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                ctx.fillStyle = '#667eea';
+                ctx.fill();
+            });
+
+            // Title
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${teamData.team} Performance Profile`, centerX, 25);
+        }
+
+        // Team Comparison
+        function updateComparison() {
+            const team1Name = document.getElementById('team1Select').value;
+            const team2Name = document.getElementById('team2Select').value;
+
+            if (!team1Name || !team2Name) return;
+
+            const team1 = teamsData.find(t => t.team === team1Name);
+            const team2 = teamsData.find(t => t.team === team2Name);
+
+            if (!team1 || !team2) return;
+
+            renderComparisonChart(team1, team2);
+        }
+
+        function renderComparisonChart(team1, team2) {
+            const canvas = document.getElementById('comparisonChart');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 400;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const metrics = [
+                { label: 'Wins', key: 'wins' },
+                { label: 'Rushing TDs', key: 'rushingTouchdowns' },
+                { label: 'Receiving TDs', key: 'receivingTouchdowns' },
+                { label: 'Total TDs', key: 'totalTouchdowns' },
+                { label: '2-PT Conv', key: 'twoPointConversions' }
+            ];
+
+            const padding = 80;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 1.5;
+            const groupWidth = chartWidth / metrics.length;
+            const barWidth = groupWidth / 2.8;
+
+            // Find max value for scaling
+            const maxValue = Math.max(
+                ...metrics.map(m => Math.max(team1[m.key], team2[m.key]))
+            );
+
+            // Title
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${team1.team} vs ${team2.team}`, canvas.width / 2, 25);
+
+            // Axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+
+            // Draw bars
+            metrics.forEach((metric, i) => {
+                const baseX = padding + i * groupWidth;
+                const team1Value = team1[metric.key];
+                const team2Value = team2[metric.key];
+                
+                const team1Height = (team1Value / maxValue) * (chartHeight * 0.9);
+                const team2Height = (team2Value / maxValue) * (chartHeight * 0.9);
+
+                const team1X = baseX + groupWidth * 0.2;
+                const team2X = team1X + barWidth + 8;
+
+                const team1Y = canvas.height - padding - team1Height;
+                const team2Y = canvas.height - padding - team2Height;
+
+                // Team 1 bar
+                ctx.fillStyle = '#667eea';
+                ctx.fillRect(team1X, team1Y, barWidth, team1Height);
+                ctx.fillStyle = '#222';
+                ctx.font = '11px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(team1Value, team1X + barWidth / 2, team1Y - 6);
+
+                // Team 2 bar
+                ctx.fillStyle = '#f093fb';
+                ctx.fillRect(team2X, team2Y, barWidth, team2Height);
+                ctx.fillStyle = '#222';
+                ctx.fillText(team2Value, team2X + barWidth / 2, team2Y - 6);
+
+                // Metric label
+                ctx.save();
+                ctx.translate(baseX + groupWidth / 2, canvas.height - padding + 20);
+                ctx.rotate(-Math.PI / 6);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#444';
+                ctx.font = '12px Arial';
+                ctx.fillText(metric.label, 0, 0);
+                ctx.restore();
+            });
+
+            // Y-axis labels
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxValue / 5) * i);
+                const y = canvas.height - padding - (chartHeight * 0.9 * i / 5);
+                ctx.fillText(value, padding - 10, y + 4);
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+            }
+
+            // Legend
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#667eea';
+            ctx.fillRect(canvas.width / 2 - 100, canvas.height - 25, 20, 15);
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'left';
+            ctx.fillText(team1.team, canvas.width / 2 - 75, canvas.height - 13);
+
+            ctx.fillStyle = '#f093fb';
+            ctx.fillRect(canvas.width / 2 + 50, canvas.height - 25, 20, 15);
+            ctx.fillStyle = '#333';
+            ctx.fillText(team2.team, canvas.width / 2 + 75, canvas.height - 13);
+        }
+
+        // Scatter Plot - Wins vs TDs
+        function renderScatterPlot() {
+            if (!teamsData || teamsData.length === 0) return;
+            
+            const canvas = document.getElementById('scatterChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 450;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const padding = 70;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 1.5;
+
+            const maxWins = Math.max(...teamsData.map(t => t.wins));
+            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
+            
+            const scatterSelect = document.getElementById('scatterTeamSelect');
+            const highlightTeam = scatterSelect ? scatterSelect.value : '';
+
+            // Title
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText('League-Wide: Wins vs Total Touchdowns', canvas.width / 2, 25);
+
+            // Axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+
+            // Grid lines
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = canvas.height - padding - (chartHeight * i / 5);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+
+                const x = padding + (chartWidth * i / 5);
+                ctx.beginPath();
+                ctx.moveTo(x, padding);
+                ctx.lineTo(x, canvas.height - padding);
+                ctx.stroke();
+            }
+
+            // Plot points (non-highlighted first, then highlighted on top)
+            const sortedTeams = [...teamsData].sort((a, b) => {
+                if (a.team === highlightTeam) return 1;
+                if (b.team === highlightTeam) return -1;
+                return 0;
+            });
+
+            sortedTeams.forEach(team => {
+                const x = padding + (team.wins / maxWins) * chartWidth;
+                const y = canvas.height - padding - (team.totalTouchdowns / maxTDs) * chartHeight;
+                const isHighlighted = team.team === highlightTeam;
+
+                ctx.beginPath();
+                ctx.arc(x, y, isHighlighted ? 9 : 6, 0, 2 * Math.PI);
+                
+                if (isHighlighted) {
+                    ctx.fillStyle = '#FFD700'; // Gold/Yellow
+                    ctx.fill();
+                    ctx.strokeStyle = '#FF8C00'; // Dark orange border
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    
+                    // Add glow effect
+                    ctx.beginPath();
+                    ctx.arc(x, y, 13, 0, 2 * Math.PI);
+                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+                    ctx.lineWidth = 6;
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = 'rgba(102, 126, 234, 0.7)';
+                    ctx.fill();
+                    ctx.strokeStyle = '#667eea';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                // Team label
+                ctx.font = isHighlighted ? 'bold 11px Arial' : '10px Arial';
+                ctx.fillStyle = isHighlighted ? '#FF8C00' : '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText(team.team, x, y - (isHighlighted ? 14 : 10));
+            });
+
+            // Axis labels
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText('Wins →', canvas.width / 2, canvas.height - 15);
+            
+            ctx.save();
+            ctx.translate(20, canvas.height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Total Touchdowns →', 0, 0);
+            ctx.restore();
+
+            // X-axis values
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxWins / 5) * i);
+                const x = padding + (chartWidth * i / 5);
+                ctx.fillText(value, x, canvas.height - padding + 20);
+            }
+
+            // Y-axis values
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxTDs / 5) * i);
+                const y = canvas.height - padding - (chartHeight * i / 5);
+                ctx.fillText(value, padding - 10, y + 4);
+            }
+        }
+
+        // Quadrant Chart
+        function renderQuadrantChart() {
+            if (!teamsData || teamsData.length === 0) return;
+            
+            const canvas = document.getElementById('quadrantChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 450;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const padding = 70;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 1.5;
+
+            const avgWins = teamsData.reduce((sum, t) => sum + t.wins, 0) / teamsData.length;
+            const avgTDs = teamsData.reduce((sum, t) => sum + t.totalTouchdowns, 0) / teamsData.length;
+            const maxWins = Math.max(...teamsData.map(t => t.wins));
+            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
+
+            // Title
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText('Team Performance Quadrants', canvas.width / 2, 25);
+
+            // Quadrant backgrounds
+            const centerX = padding + (avgWins / maxWins) * chartWidth;
+            const centerY = canvas.height - padding - (avgTDs / maxTDs) * chartHeight;
+
+            // Top-right: Elite (High Wins, High TDs)
+            ctx.fillStyle = 'rgba(102, 200, 102, 0.1)';
+            ctx.fillRect(centerX, padding, canvas.width - padding - centerX, centerY - padding);
+
+            // Top-left: Defensive (Low Wins, High TDs)
+            ctx.fillStyle = 'rgba(255, 200, 102, 0.1)';
+            ctx.fillRect(padding, padding, centerX - padding, centerY - padding);
+
+            // Bottom-right: Efficient (High Wins, Low TDs)
+            ctx.fillStyle = 'rgba(102, 150, 255, 0.1)';
+            ctx.fillRect(centerX, centerY, canvas.width - padding - centerX, canvas.height - padding - centerY);
+
+            // Bottom-left: Struggling (Low Wins, Low TDs)
+            ctx.fillStyle = 'rgba(255, 102, 102, 0.1)';
+            ctx.fillRect(padding, centerY, centerX - padding, canvas.height - padding - centerY);
+
+            // Quadrant lines
+            ctx.strokeStyle = '#999';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(centerX, padding);
+            ctx.lineTo(centerX, canvas.height - padding);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(padding, centerY);
+            ctx.lineTo(canvas.width - padding, centerY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+
+            // Plot teams
+            teamsData.forEach(team => {
+                const x = padding + (team.wins / maxWins) * chartWidth;
+                const y = canvas.height - padding - (team.totalTouchdowns / maxTDs) * chartHeight;
+
+                // Color based on quadrant
+                let color;
+                if (team.wins >= avgWins && team.totalTouchdowns >= avgTDs) {
+                    color = '#4CAF50'; // Elite - Green
+                } else if (team.wins < avgWins && team.totalTouchdowns >= avgTDs) {
+                    color = '#FF9800'; // Unlucky - Orange
+                } else if (team.wins >= avgWins && team.totalTouchdowns < avgTDs) {
+                    color = '#2196F3'; // Efficient - Blue
+                } else {
+                    color = '#F44336'; // Struggling - Red
+                }
+
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Team label
+                ctx.font = '9px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText(team.team, x, y - 8);
+            });
+
+            // Quadrant labels
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = '#666';
+            ctx.textAlign = 'center';
+            ctx.fillText('🏆 Elite', (centerX + canvas.width - padding) / 2, padding + 20);
+            ctx.fillText('⚡ High Scoring', (padding + centerX) / 2, padding + 20);
+            ctx.fillText('🛡️ Efficient', (centerX + canvas.width - padding) / 2, canvas.height - padding - 10);
+            ctx.fillText('📉 Struggling', (padding + centerX) / 2, canvas.height - padding - 10);
+
+            // Axis labels
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText('Wins →', canvas.width / 2, canvas.height - 15);
+            
+            ctx.save();
+            ctx.translate(20, canvas.height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Total Touchdowns →', 0, 0);
+            ctx.restore();
+
+            // Axis values
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'center';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxWins / 5) * i);
+                const x = padding + (chartWidth * i / 5);
+                ctx.fillText(value, x, canvas.height - padding + 20);
+            }
+
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxTDs / 5) * i);
+                const y = canvas.height - padding - (chartHeight * i / 5);
+                ctx.fillText(value, padding - 10, y + 4);
+            }
+        }
+
+        // Render grouped bars for Top 10 teams (Wins and Total TDs with ranks)
+        function renderTop10Chart() {
+            if (!top10Data.length) return;
+            const canvas = document.getElementById('top10Chart');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 360;
+
+            const ordered = [...top10Data].sort((a, b) => {
+                if (a.winRank === b.winRank) return a.tdRank - b.tdRank;
+                return a.winRank - b.winRank;
+            });
+
+            const padding = 70;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 1.3;
+            const groupWidth = chartWidth / ordered.length;
+            const barWidth = groupWidth / 2.4;
+            const maxValue = Math.max(
+                ...ordered.map(t => Math.max(t.wins, t.totalTouchdowns))
+            );
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding * 0.6);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+
+            ordered.forEach((team, i) => {
+                const baseX = padding + i * groupWidth;
+                const winsHeight = (team.wins / maxValue) * (chartHeight * 0.9);
+                const tdHeight = (team.totalTouchdowns / maxValue) * (chartHeight * 0.9);
+                const winsX = baseX + groupWidth * 0.15;
+                const tdX = winsX + barWidth + 6;
+                const winsY = canvas.height - padding - winsHeight;
+                const tdY = canvas.height - padding - tdHeight;
+
+                // Wins bar
+                ctx.fillStyle = '#667eea';
+                ctx.fillRect(winsX, winsY, barWidth, winsHeight);
+                ctx.fillStyle = '#1f1f1f';
+                ctx.font = '11px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${team.wins} (R${team.winRank})`, winsX + barWidth / 2, winsY - 6);
+
+                // Total TD bar
+                ctx.fillStyle = '#f093fb';
+                ctx.fillRect(tdX, tdY, barWidth, tdHeight);
+                ctx.fillStyle = '#1f1f1f';
+                ctx.fillText(`${team.totalTouchdowns} (R${team.tdRank})`, tdX + barWidth / 2, tdY - 6);
+
+                // Team label
+                ctx.save();
+                ctx.translate(baseX + groupWidth / 2, canvas.height - padding + 22);
+                ctx.rotate(-Math.PI / 6);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#444';
+                ctx.font = '12px Arial';
+                ctx.fillText(team.team, 0, 0);
+                ctx.restore();
+            });
+
+            // y-axis labels + grid
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxValue / 5) * i);
+                const y = canvas.height - padding - (chartHeight * 0.9 * i / 5);
+                ctx.fillText(value, padding - 10, y + 4);
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+            }
+        }
+
         // Load and parse CSV data
         async function loadCSVData() {
             try {
                 const response = await fetch('2024_Team_Scoring_Standings.csv');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const csvText = await response.text();
+                
+                if (!csvText || csvText.trim().length === 0) {
+                    throw new Error('CSV file is empty');
+                }
                 
                 const lines = csvText.trim().split('\n');
                 const headers = lines[0].split(',');
@@ -397,10 +1157,15 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
                 populateTeamDropdown();
                 // kick off secondary visuals once base data is ready
                 if (top10Data.length) renderTop10Chart();
+                renderScatterPlot();
+                renderQuadrantChart();
             } catch (error) {
                 console.error('Error loading CSV:', error);
-                document.querySelector('.chart-container').innerHTML = 
-                    '<div class="error">Error loading data. Please ensure 2024_Team_Scoring_Standings.csv is in the same directory.</div>';
+                const chartContainers = document.querySelectorAll('.chart-container');
+                if (chartContainers.length > 0) {
+                    chartContainers[0].innerHTML = 
+                        '<div class="error">Error loading data: ' + error.message + '<br>Please ensure 2024_Team_Scoring_Standings.csv is in the same directory.</div>';
+                }
             }
         }
 
@@ -433,11 +1198,23 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
         // Populate the team dropdown
         function populateTeamDropdown() {
             const select = document.getElementById('teamSelect');
+            const team1Select = document.getElementById('team1Select');
+            const team2Select = document.getElementById('team2Select');
+            const scatterTeamSelect = document.getElementById('scatterTeamSelect');
+            
             teamsData.forEach(team => {
                 const option = document.createElement('option');
                 option.value = team.team;
                 option.textContent = team.team;
                 select.appendChild(option);
+
+                // Add to comparison dropdowns
+                const option1 = option.cloneNode(true);
+                const option2 = option.cloneNode(true);
+                const option3 = option.cloneNode(true);
+                team1Select.appendChild(option1);
+                team2Select.appendChild(option2);
+                scatterTeamSelect.appendChild(option3);
             });
 
             select.addEventListener('change', (e) => {
@@ -445,6 +1222,13 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
                     displayTeamData(e.target.value);
                 }
             });
+
+            // Team comparison listeners
+            team1Select.addEventListener('change', updateComparison);
+            team2Select.addEventListener('change', updateComparison);
+            
+            // Scatter plot highlight listener
+            scatterTeamSelect.addEventListener('change', renderScatterPlot);
         }
 
         // Display selected team data
@@ -457,6 +1241,14 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
 
             // Update stats summary
             updateStatsSummary(teamData);
+
+            // Show and update pie chart
+            document.getElementById('offensiveBalanceSection').style.display = 'block';
+            renderPieChart(teamData);
+
+            // Show and update radar chart
+            document.getElementById('radarSection').style.display = 'block';
+            renderRadarChart(teamData);
         }
 
         // Create/Update chart
@@ -590,7 +1382,590 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
                 displayTeamData(select.value);
             }
             if (top10Data.length) renderTop10Chart();
+            updateComparison();
+            renderScatterPlot();
+            renderQuadrantChart();
         });
+    </script>
+</body>
+</html>
+            const canvas = document.getElementById('pieChart');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 350;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2 - 20;
+            const radius = Math.min(centerX, centerY) - 40;
+
+            const rushing = teamData.rushingTouchdowns;
+            const receiving = teamData.receivingTouchdowns;
+            const total = rushing + receiving;
+
+            if (total === 0) return;
+
+            const rushingAngle = (rushing / total) * 2 * Math.PI;
+            const receivingAngle = (receiving / total) * 2 * Math.PI;
+
+            // Draw rushing slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, 0, rushingAngle);
+            ctx.closePath();
+            ctx.fillStyle = '#667eea';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw receiving slice
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, rushingAngle, rushingAngle + receivingAngle);
+            ctx.closePath();
+            ctx.fillStyle = '#f093fb';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Labels
+            ctx.font = 'bold 16px Arial';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+
+            const rushingLabelAngle = rushingAngle / 2;
+            const rushingLabelX = centerX + Math.cos(rushingLabelAngle) * (radius * 0.6);
+            const rushingLabelY = centerY + Math.sin(rushingLabelAngle) * (radius * 0.6);
+            ctx.fillText(`${rushing}`, rushingLabelX, rushingLabelY);
+
+            const receivingLabelAngle = rushingAngle + receivingAngle / 2;
+            const receivingLabelX = centerX + Math.cos(receivingLabelAngle) * (radius * 0.6);
+            const receivingLabelY = centerY + Math.sin(receivingLabelAngle) * (radius * 0.6);
+            ctx.fillText(`${receiving}`, receivingLabelX, receivingLabelY);
+
+            // Title
+            ctx.font = 'bold 20px Arial';
+            ctx.fillStyle = '#333';
+            ctx.fillText(`${teamData.team} - TD Breakdown`, centerX, 30);
+
+            // Legend
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#667eea';
+            ctx.fillRect(centerX - 150, canvas.height - 40, 20, 20);
+            ctx.fillStyle = '#333';
+            ctx.fillText(`Rushing TDs: ${rushing} (${(rushing/total*100).toFixed(1)}%)`, centerX - 125, canvas.height - 25);
+
+            ctx.fillStyle = '#f093fb';
+            ctx.fillRect(centerX + 30, canvas.height - 40, 20, 20);
+            ctx.fillStyle = '#333';
+            ctx.fillText(`Receiving TDs: ${receiving} (${(receiving/total*100).toFixed(1)}%)`, centerX + 55, canvas.height - 25);
+        }
+
+        // Radar Chart - Team Profile
+        function renderRadarChart(teamData) {
+            const canvas = document.getElementById('radarChart');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 400;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 80;
+
+            // Normalize data to 0-1 scale
+            const maxWins = Math.max(...teamsData.map(t => t.wins));
+            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
+            const maxRushTDs = Math.max(...teamsData.map(t => t.rushingTouchdowns));
+            const maxRecTDs = Math.max(...teamsData.map(t => t.receivingTouchdowns));
+            const max2PT = Math.max(...teamsData.map(t => t.twoPointConversions));
+
+            const metrics = [
+                { label: 'Wins', value: teamData.wins / maxWins, raw: teamData.wins },
+                { label: 'Total TDs', value: teamData.totalTouchdowns / maxTDs, raw: teamData.totalTouchdowns },
+                { label: 'Rushing TDs', value: teamData.rushingTouchdowns / maxRushTDs, raw: teamData.rushingTouchdowns },
+                { label: 'Receiving TDs', value: teamData.receivingTouchdowns / maxRecTDs, raw: teamData.receivingTouchdowns },
+                { label: '2-PT Conv', value: teamData.twoPointConversions / (max2PT || 1), raw: teamData.twoPointConversions }
+            ];
+
+            const angleStep = (2 * Math.PI) / metrics.length;
+
+            // Draw grid circles
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            for (let i = 1; i <= 5; i++) {
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, (radius / 5) * i, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+
+            // Draw axes
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            metrics.forEach((metric, i) => {
+                const angle = i * angleStep - Math.PI / 2;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+
+                // Labels
+                ctx.font = '12px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                const labelX = centerX + Math.cos(angle) * (radius + 25);
+                const labelY = centerY + Math.sin(angle) * (radius + 25);
+                ctx.fillText(metric.label, labelX, labelY);
+                ctx.fillText(`(${metric.raw})`, labelX, labelY + 15);
+            });
+
+            // Draw data polygon
+            ctx.beginPath();
+            metrics.forEach((metric, i) => {
+                const angle = i * angleStep - Math.PI / 2;
+                const distance = metric.value * radius;
+                const x = centerX + Math.cos(angle) * distance;
+                const y = centerY + Math.sin(angle) * distance;
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(102, 126, 234, 0.3)';
+            ctx.fill();
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw points
+            metrics.forEach((metric, i) => {
+                const angle = i * angleStep - Math.PI / 2;
+                const distance = metric.value * radius;
+                const x = centerX + Math.cos(angle) * distance;
+                const y = centerY + Math.sin(angle) * distance;
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                ctx.fillStyle = '#667eea';
+                ctx.fill();
+            });
+
+            // Title
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${teamData.team} Performance Profile`, centerX, 25);
+        }
+
+        // Team Comparison
+        function updateComparison() {
+            const team1Name = document.getElementById('team1Select').value;
+            const team2Name = document.getElementById('team2Select').value;
+
+            if (!team1Name || !team2Name) return;
+
+            const team1 = teamsData.find(t => t.team === team1Name);
+            const team2 = teamsData.find(t => t.team === team2Name);
+
+            if (!team1 || !team2) return;
+
+            renderComparisonChart(team1, team2);
+        }
+
+        function renderComparisonChart(team1, team2) {
+            const canvas = document.getElementById('comparisonChart');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 400;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const metrics = [
+                { label: 'Wins', key: 'wins' },
+                { label: 'Rushing TDs', key: 'rushingTouchdowns' },
+                { label: 'Receiving TDs', key: 'receivingTouchdowns' },
+                { label: 'Total TDs', key: 'totalTouchdowns' },
+                { label: '2-PT Conv', key: 'twoPointConversions' }
+            ];
+
+            const padding = 80;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 1.5;
+            const groupWidth = chartWidth / metrics.length;
+            const barWidth = groupWidth / 2.8;
+
+            // Find max value for scaling
+            const maxValue = Math.max(
+                ...metrics.map(m => Math.max(team1[m.key], team2[m.key]))
+            );
+
+            // Title
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${team1.team} vs ${team2.team}`, canvas.width / 2, 25);
+
+            // Axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+
+            // Draw bars
+            metrics.forEach((metric, i) => {
+                const baseX = padding + i * groupWidth;
+                const team1Value = team1[metric.key];
+                const team2Value = team2[metric.key];
+                
+                const team1Height = (team1Value / maxValue) * (chartHeight * 0.9);
+                const team2Height = (team2Value / maxValue) * (chartHeight * 0.9);
+
+                const team1X = baseX + groupWidth * 0.2;
+                const team2X = team1X + barWidth + 8;
+
+                const team1Y = canvas.height - padding - team1Height;
+                const team2Y = canvas.height - padding - team2Height;
+
+                // Team 1 bar
+                ctx.fillStyle = '#667eea';
+                ctx.fillRect(team1X, team1Y, barWidth, team1Height);
+                ctx.fillStyle = '#222';
+                ctx.font = '11px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(team1Value, team1X + barWidth / 2, team1Y - 6);
+
+                // Team 2 bar
+                ctx.fillStyle = '#f093fb';
+                ctx.fillRect(team2X, team2Y, barWidth, team2Height);
+                ctx.fillStyle = '#222';
+                ctx.fillText(team2Value, team2X + barWidth / 2, team2Y - 6);
+
+                // Metric label
+                ctx.save();
+                ctx.translate(baseX + groupWidth / 2, canvas.height - padding + 20);
+                ctx.rotate(-Math.PI / 6);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#444';
+                ctx.font = '12px Arial';
+                ctx.fillText(metric.label, 0, 0);
+                ctx.restore();
+            });
+
+            // Y-axis labels
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxValue / 5) * i);
+                const y = canvas.height - padding - (chartHeight * 0.9 * i / 5);
+                ctx.fillText(value, padding - 10, y + 4);
+                
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+            }
+
+            // Legend
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#667eea';
+            ctx.fillRect(canvas.width / 2 - 100, canvas.height - 25, 20, 15);
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'left';
+            ctx.fillText(team1.team, canvas.width / 2 - 75, canvas.height - 13);
+
+        // Scatter Plot - Wins vs TDs
+        function renderScatterPlot() {
+            if (!teamsData || teamsData.length === 0) return;
+            
+            const canvas = document.getElementById('scatterChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 450;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const padding = 70;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 1.5;
+
+            const maxWins = Math.max(...teamsData.map(t => t.wins));
+            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
+            
+            const scatterSelect = document.getElementById('scatterTeamSelect');
+            const highlightTeam = scatterSelect ? scatterSelect.value : '';
+
+            // Title
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText('League-Wide: Wins vs Total Touchdowns', canvas.width / 2, 25);
+
+            // Axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+
+            // Grid lines
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = canvas.height - padding - (chartHeight * i / 5);
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+
+                const x = padding + (chartWidth * i / 5);
+                ctx.beginPath();
+                ctx.moveTo(x, padding);
+                ctx.lineTo(x, canvas.height - padding);
+                ctx.stroke();
+            }
+
+            // Plot points (non-highlighted first, then highlighted on top)
+            const sortedTeams = [...teamsData].sort((a, b) => {
+                if (a.team === highlightTeam) return 1;
+                if (b.team === highlightTeam) return -1;
+                return 0;
+            });
+
+            sortedTeams.forEach(team => {
+                const x = padding + (team.wins / maxWins) * chartWidth;
+                const y = canvas.height - padding - (team.totalTouchdowns / maxTDs) * chartHeight;
+                const isHighlighted = team.team === highlightTeam;
+
+                ctx.beginPath();
+                ctx.arc(x, y, isHighlighted ? 9 : 6, 0, 2 * Math.PI);
+                
+                if (isHighlighted) {
+                    ctx.fillStyle = '#FFD700'; // Gold/Yellow
+                    ctx.fill();
+                    ctx.strokeStyle = '#FF8C00'; // Dark orange border
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    
+                    // Add glow effect
+                    ctx.beginPath();
+                    ctx.arc(x, y, 13, 0, 2 * Math.PI);
+                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+                    ctx.lineWidth = 6;
+                    ctx.stroke();
+                } else {
+                    ctx.fillStyle = 'rgba(102, 126, 234, 0.7)';
+                    ctx.fill();
+                    ctx.strokeStyle = '#667eea';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                // Team label
+                ctx.font = isHighlighted ? 'bold 11px Arial' : '10px Arial';
+                ctx.fillStyle = isHighlighted ? '#FF8C00' : '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText(team.team, x, y - (isHighlighted ? 14 : 10));
+            });
+
+            // Axis labels
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText('Wins →', canvas.width / 2, canvas.height - 15);
+            
+            ctx.save();
+            ctx.translate(20, canvas.height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Total Touchdowns →', 0, 0);
+            ctx.restore();
+
+            // X-axis values
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxWins / 5) * i);
+                const x = padding + (chartWidth * i / 5);
+                ctx.fillText(value, x, canvas.height - padding + 20);
+            }
+
+            // Y-axis values
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxTDs / 5) * i);
+                const y = canvas.height - padding - (chartHeight * i / 5);
+                ctx.fillText(value, padding - 10, y + 4);
+            }
+        }   ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxTDs / 5) * i);
+                const y = canvas.height - padding - (chartHeight * i / 5);
+                ctx.fillText(value, padding - 10, y + 4);
+            }
+        }
+
+        // Quadrant Chart
+        function renderQuadrantChart() {
+            if (!teamsData || teamsData.length === 0) return;
+            
+            const canvas = document.getElementById('quadrantChart');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = 450;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const padding = 70;
+            const chartWidth = canvas.width - padding * 2;
+            const chartHeight = canvas.height - padding * 1.5;
+
+            const avgWins = teamsData.reduce((sum, t) => sum + t.wins, 0) / teamsData.length;
+            const avgTDs = teamsData.reduce((sum, t) => sum + t.totalTouchdowns, 0) / teamsData.length;
+            const maxWins = Math.max(...teamsData.map(t => t.wins));
+            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
+
+            // Title
+            ctx.font = 'bold 18px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText('Team Performance Quadrants', canvas.width / 2, 25);
+
+            // Quadrant backgrounds
+            const centerX = padding + (avgWins / maxWins) * chartWidth;
+            const centerY = canvas.height - padding - (avgTDs / maxTDs) * chartHeight;
+
+            // Top-right: Elite (High Wins, High TDs)
+            ctx.fillStyle = 'rgba(102, 200, 102, 0.1)';
+            ctx.fillRect(centerX, padding, canvas.width - padding - centerX, centerY - padding);
+
+            // Top-left: Defensive (Low Wins, High TDs)
+            ctx.fillStyle = 'rgba(255, 200, 102, 0.1)';
+            ctx.fillRect(padding, padding, centerX - padding, centerY - padding);
+
+            // Bottom-right: Efficient (High Wins, Low TDs)
+            ctx.fillStyle = 'rgba(102, 150, 255, 0.1)';
+            ctx.fillRect(centerX, centerY, canvas.width - padding - centerX, canvas.height - padding - centerY);
+
+            // Bottom-left: Struggling (Low Wins, Low TDs)
+            ctx.fillStyle = 'rgba(255, 102, 102, 0.1)';
+            ctx.fillRect(padding, centerY, centerX - padding, canvas.height - padding - centerY);
+
+            // Quadrant lines
+            ctx.strokeStyle = '#999';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(centerX, padding);
+            ctx.lineTo(centerX, canvas.height - padding);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(padding, centerY);
+            ctx.lineTo(canvas.width - padding, centerY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Axes
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+
+            // Plot teams
+            teamsData.forEach(team => {
+                const x = padding + (team.wins / maxWins) * chartWidth;
+                const y = canvas.height - padding - (team.totalTouchdowns / maxTDs) * chartHeight;
+
+                // Color based on quadrant
+                let color;
+                if (team.wins >= avgWins && team.totalTouchdowns >= avgTDs) {
+                    color = '#4CAF50'; // Elite - Green
+                } else if (team.wins < avgWins && team.totalTouchdowns >= avgTDs) {
+                    color = '#FF9800'; // Unlucky - Orange
+                } else if (team.wins >= avgWins && team.totalTouchdowns < avgTDs) {
+                    color = '#2196F3'; // Efficient - Blue
+                } else {
+                    color = '#F44336'; // Struggling - Red
+                }
+
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Team label
+                ctx.font = '9px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                ctx.fillText(team.team, x, y - 8);
+            });
+
+            // Quadrant labels
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = '#666';
+            ctx.textAlign = 'center';
+            ctx.fillText('🏆 Elite', (centerX + canvas.width - padding) / 2, padding + 20);
+            ctx.fillText('⚡ High Scoring', (padding + centerX) / 2, padding + 20);
+            ctx.fillText('🛡️ Efficient', (centerX + canvas.width - padding) / 2, canvas.height - padding - 10);
+            ctx.fillText('📉 Struggling', (padding + centerX) / 2, canvas.height - padding - 10);
+
+            // Axis labels
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.fillText('Wins →', canvas.width / 2, canvas.height - 15);
+            
+            ctx.save();
+            ctx.translate(20, canvas.height / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Total Touchdowns →', 0, 0);
+            ctx.restore();
+
+            // Axis values
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'center';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxWins / 5) * i);
+                const x = padding + (chartWidth * i / 5);
+                ctx.fillText(value, x, canvas.height - padding + 20);
+            }
+
+            ctx.textAlign = 'right';
+            for (let i = 0; i <= 5; i++) {
+                const value = Math.round((maxTDs / 5) * i);
+                const y = canvas.height - padding - (chartHeight * i / 5);
+                ctx.fillText(value, padding - 10, y + 4);
+            }
+        }
 
         // Render grouped bars for Top 10 teams (Wins and Total TDs with ranks)
         function renderTop10Chart() {

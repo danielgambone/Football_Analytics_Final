@@ -241,16 +241,6 @@
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
-
-        .quadrant-label {
-            position: absolute;
-            font-size: 11px;
-            color: #666;
-            font-weight: 600;
-            background: rgba(255,255,255,0.9);
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
     </style>
 </head>
 <body>
@@ -316,14 +306,6 @@
             </div>
             <div class="chart-container" style="height: 500px;">
                 <canvas id="scatterChart"></canvas>
-            </div>
-        </section>
-
-        <!-- Quadrant Chart -->
-        <section class="viz-section">
-            <h2>Team Performance Quadrants</h2>
-            <div class="chart-container" style="height: 500px; position: relative;">
-                <canvas id="quadrantChart"></canvas>
             </div>
         </section>
 
@@ -897,148 +879,6 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
             }
         }
 
-        // Quadrant Chart
-        function renderQuadrantChart() {
-            if (!teamsData || teamsData.length === 0) return;
-            
-            const canvas = document.getElementById('quadrantChart');
-            if (!canvas) return;
-            
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = canvas.parentElement.clientWidth - 40;
-            canvas.height = 450;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const padding = 70;
-            const chartWidth = canvas.width - padding * 2;
-            const chartHeight = canvas.height - padding * 1.5;
-
-            const avgWins = teamsData.reduce((sum, t) => sum + t.wins, 0) / teamsData.length;
-            const avgTDs = teamsData.reduce((sum, t) => sum + t.totalTouchdowns, 0) / teamsData.length;
-            const maxWins = Math.max(...teamsData.map(t => t.wins));
-            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
-
-            // Title
-            ctx.font = 'bold 18px Arial';
-            ctx.fillStyle = '#333';
-            ctx.textAlign = 'center';
-            ctx.fillText('Team Performance Quadrants', canvas.width / 2, 25);
-
-            // Quadrant backgrounds
-            const centerX = padding + (avgWins / maxWins) * chartWidth;
-            const centerY = canvas.height - padding - (avgTDs / maxTDs) * chartHeight;
-
-            // Top-right: Elite (High Wins, High TDs)
-            ctx.fillStyle = 'rgba(102, 200, 102, 0.1)';
-            ctx.fillRect(centerX, padding, canvas.width - padding - centerX, centerY - padding);
-
-            // Top-left: Defensive (Low Wins, High TDs)
-            ctx.fillStyle = 'rgba(255, 200, 102, 0.1)';
-            ctx.fillRect(padding, padding, centerX - padding, centerY - padding);
-
-            // Bottom-right: Efficient (High Wins, Low TDs)
-            ctx.fillStyle = 'rgba(102, 150, 255, 0.1)';
-            ctx.fillRect(centerX, centerY, canvas.width - padding - centerX, canvas.height - padding - centerY);
-
-            // Bottom-left: Struggling (Low Wins, Low TDs)
-            ctx.fillStyle = 'rgba(255, 102, 102, 0.1)';
-            ctx.fillRect(padding, centerY, centerX - padding, canvas.height - padding - centerY);
-
-            // Quadrant lines
-            ctx.strokeStyle = '#999';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(centerX, padding);
-            ctx.lineTo(centerX, canvas.height - padding);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(padding, centerY);
-            ctx.lineTo(canvas.width - padding, centerY);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Axes
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(padding, padding);
-            ctx.lineTo(padding, canvas.height - padding);
-            ctx.lineTo(canvas.width - padding, canvas.height - padding);
-            ctx.stroke();
-
-            // Plot teams
-            teamsData.forEach(team => {
-                const x = padding + (team.wins / maxWins) * chartWidth;
-                const y = canvas.height - padding - (team.totalTouchdowns / maxTDs) * chartHeight;
-
-                // Color based on quadrant
-                let color;
-                if (team.wins >= avgWins && team.totalTouchdowns >= avgTDs) {
-                    color = '#4CAF50'; // Elite - Green
-                } else if (team.wins < avgWins && team.totalTouchdowns >= avgTDs) {
-                    color = '#FF9800'; // Unlucky - Orange
-                } else if (team.wins >= avgWins && team.totalTouchdowns < avgTDs) {
-                    color = '#2196F3'; // Efficient - Blue
-                } else {
-                    color = '#F44336'; // Struggling - Red
-                }
-
-                ctx.beginPath();
-                ctx.arc(x, y, 5, 0, 2 * Math.PI);
-                ctx.fillStyle = color;
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                // Team label
-                ctx.font = '9px Arial';
-                ctx.fillStyle = '#333';
-                ctx.textAlign = 'center';
-                ctx.fillText(team.team, x, y - 8);
-            });
-
-            // Quadrant labels
-            ctx.font = 'bold 12px Arial';
-            ctx.fillStyle = '#666';
-            ctx.textAlign = 'center';
-            ctx.fillText('🏆 Elite', (centerX + canvas.width - padding) / 2, padding + 20);
-            ctx.fillText('⚡ High Scoring', (padding + centerX) / 2, padding + 20);
-            ctx.fillText('🛡️ Efficient', (centerX + canvas.width - padding) / 2, canvas.height - padding - 10);
-            ctx.fillText('📉 Struggling', (padding + centerX) / 2, canvas.height - padding - 10);
-
-            // Axis labels
-            ctx.font = '14px Arial';
-            ctx.fillStyle = '#333';
-            ctx.textAlign = 'center';
-            ctx.fillText('Wins →', canvas.width / 2, canvas.height - 15);
-            
-            ctx.save();
-            ctx.translate(20, canvas.height / 2);
-            ctx.rotate(-Math.PI / 2);
-            ctx.fillText('Total Touchdowns →', 0, 0);
-            ctx.restore();
-
-            // Axis values
-            ctx.font = '11px Arial';
-            ctx.textAlign = 'center';
-            for (let i = 0; i <= 5; i++) {
-                const value = Math.round((maxWins / 5) * i);
-                const x = padding + (chartWidth * i / 5);
-                ctx.fillText(value, x, canvas.height - padding + 20);
-            }
-
-            ctx.textAlign = 'right';
-            for (let i = 0; i <= 5; i++) {
-                const value = Math.round((maxTDs / 5) * i);
-                const y = canvas.height - padding - (chartHeight * i / 5);
-                ctx.fillText(value, padding - 10, y + 4);
-            }
-        }
-
         // Render grouped bars for Top 10 teams (Wins and Total TDs with ranks)
         function renderTop10Chart() {
             if (!top10Data.length) return;
@@ -1158,7 +998,6 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
                 // kick off secondary visuals once base data is ready
                 if (top10Data.length) renderTop10Chart();
                 renderScatterPlot();
-                renderQuadrantChart();
             } catch (error) {
                 console.error('Error loading CSV:', error);
                 const chartContainers = document.querySelectorAll('.chart-container');
@@ -1384,7 +1223,6 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
             if (top10Data.length) renderTop10Chart();
             updateComparison();
             renderScatterPlot();
-            renderQuadrantChart();
         });
     </script>
 </body>
@@ -1811,154 +1649,6 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
             }
 
             // Y-axis values
-            ctx.textAlign = 'right';
-            for (let i = 0; i <= 5; i++) {
-                const value = Math.round((maxTDs / 5) * i);
-                const y = canvas.height - padding - (chartHeight * i / 5);
-                ctx.fillText(value, padding - 10, y + 4);
-            }
-        }   ctx.textAlign = 'right';
-            for (let i = 0; i <= 5; i++) {
-                const value = Math.round((maxTDs / 5) * i);
-                const y = canvas.height - padding - (chartHeight * i / 5);
-                ctx.fillText(value, padding - 10, y + 4);
-            }
-        }
-
-        // Quadrant Chart
-        function renderQuadrantChart() {
-            if (!teamsData || teamsData.length === 0) return;
-            
-            const canvas = document.getElementById('quadrantChart');
-            if (!canvas) return;
-            
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = canvas.parentElement.clientWidth - 40;
-            canvas.height = 450;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const padding = 70;
-            const chartWidth = canvas.width - padding * 2;
-            const chartHeight = canvas.height - padding * 1.5;
-
-            const avgWins = teamsData.reduce((sum, t) => sum + t.wins, 0) / teamsData.length;
-            const avgTDs = teamsData.reduce((sum, t) => sum + t.totalTouchdowns, 0) / teamsData.length;
-            const maxWins = Math.max(...teamsData.map(t => t.wins));
-            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
-
-            // Title
-            ctx.font = 'bold 18px Arial';
-            ctx.fillStyle = '#333';
-            ctx.textAlign = 'center';
-            ctx.fillText('Team Performance Quadrants', canvas.width / 2, 25);
-
-            // Quadrant backgrounds
-            const centerX = padding + (avgWins / maxWins) * chartWidth;
-            const centerY = canvas.height - padding - (avgTDs / maxTDs) * chartHeight;
-
-            // Top-right: Elite (High Wins, High TDs)
-            ctx.fillStyle = 'rgba(102, 200, 102, 0.1)';
-            ctx.fillRect(centerX, padding, canvas.width - padding - centerX, centerY - padding);
-
-            // Top-left: Defensive (Low Wins, High TDs)
-            ctx.fillStyle = 'rgba(255, 200, 102, 0.1)';
-            ctx.fillRect(padding, padding, centerX - padding, centerY - padding);
-
-            // Bottom-right: Efficient (High Wins, Low TDs)
-            ctx.fillStyle = 'rgba(102, 150, 255, 0.1)';
-            ctx.fillRect(centerX, centerY, canvas.width - padding - centerX, canvas.height - padding - centerY);
-
-            // Bottom-left: Struggling (Low Wins, Low TDs)
-            ctx.fillStyle = 'rgba(255, 102, 102, 0.1)';
-            ctx.fillRect(padding, centerY, centerX - padding, canvas.height - padding - centerY);
-
-            // Quadrant lines
-            ctx.strokeStyle = '#999';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath();
-            ctx.moveTo(centerX, padding);
-            ctx.lineTo(centerX, canvas.height - padding);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(padding, centerY);
-            ctx.lineTo(canvas.width - padding, centerY);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Axes
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(padding, padding);
-            ctx.lineTo(padding, canvas.height - padding);
-            ctx.lineTo(canvas.width - padding, canvas.height - padding);
-            ctx.stroke();
-
-            // Plot teams
-            teamsData.forEach(team => {
-                const x = padding + (team.wins / maxWins) * chartWidth;
-                const y = canvas.height - padding - (team.totalTouchdowns / maxTDs) * chartHeight;
-
-                // Color based on quadrant
-                let color;
-                if (team.wins >= avgWins && team.totalTouchdowns >= avgTDs) {
-                    color = '#4CAF50'; // Elite - Green
-                } else if (team.wins < avgWins && team.totalTouchdowns >= avgTDs) {
-                    color = '#FF9800'; // Unlucky - Orange
-                } else if (team.wins >= avgWins && team.totalTouchdowns < avgTDs) {
-                    color = '#2196F3'; // Efficient - Blue
-                } else {
-                    color = '#F44336'; // Struggling - Red
-                }
-
-                ctx.beginPath();
-                ctx.arc(x, y, 5, 0, 2 * Math.PI);
-                ctx.fillStyle = color;
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                // Team label
-                ctx.font = '9px Arial';
-                ctx.fillStyle = '#333';
-                ctx.textAlign = 'center';
-                ctx.fillText(team.team, x, y - 8);
-            });
-
-            // Quadrant labels
-            ctx.font = 'bold 12px Arial';
-            ctx.fillStyle = '#666';
-            ctx.textAlign = 'center';
-            ctx.fillText('🏆 Elite', (centerX + canvas.width - padding) / 2, padding + 20);
-            ctx.fillText('⚡ High Scoring', (padding + centerX) / 2, padding + 20);
-            ctx.fillText('🛡️ Efficient', (centerX + canvas.width - padding) / 2, canvas.height - padding - 10);
-            ctx.fillText('📉 Struggling', (padding + centerX) / 2, canvas.height - padding - 10);
-
-            // Axis labels
-            ctx.font = '14px Arial';
-            ctx.fillStyle = '#333';
-            ctx.textAlign = 'center';
-            ctx.fillText('Wins →', canvas.width / 2, canvas.height - 15);
-            
-            ctx.save();
-            ctx.translate(20, canvas.height / 2);
-            ctx.rotate(-Math.PI / 2);
-            ctx.fillText('Total Touchdowns →', 0, 0);
-            ctx.restore();
-
-            // Axis values
-            ctx.font = '11px Arial';
-            ctx.textAlign = 'center';
-            for (let i = 0; i <= 5; i++) {
-                const value = Math.round((maxWins / 5) * i);
-                const x = padding + (chartWidth * i / 5);
-                ctx.fillText(value, x, canvas.height - padding + 20);
-            }
-
             ctx.textAlign = 'right';
             for (let i = 0; i <= 5; i++) {
                 const value = Math.round((maxTDs / 5) * i);

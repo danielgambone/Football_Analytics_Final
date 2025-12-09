@@ -1,6 +1,8 @@
 # Landing page: 
 ## Overview: 
 I used the 2024 NFL regular season league standings statistics and the 2024 NFL team scoring statistics from the NFL website to create a web application that educates the user about a given team's success during the year with statistical proof. I hoped to show the correlation between team standings and scoring.
+
+Git Hub Project:
 https://github.com/danielgambone/Football_Analytics_Final
 
 ## Web scraping:
@@ -130,19 +132,19 @@ I used the two following AI prompts to create the web scrape code:
 ## Database:
 I used the following tables and columns:
  - league_standings_2024 - Team standings for the 2024 NFL season (Team Name, Wins, Losses, Ties)
-    ls.id, -- auto generated primary key. Not needed in output.
-    ls.team_id, -- Team Id used to uniquely identify each team 
-    ls.NFL_Team,-- Team name
-    ls.W, -- Wins
-    ls.L, -- Losses
-    ls.T  -- Ties
+    id, -- auto generated primary key. Not needed in output.
+    team_id, -- Team Id used to uniquely identify each team 
+    NFL_Team,-- Team name
+    W, -- Wins
+    L, -- Losses
+    T  -- Ties
  - team_scoring_2024 - Team scoring statistics for the 2024 NFL season (includes Rushing TDs, Receiving TDs, Total TDs, 2 Points Conversions)
-    s.id AS team_id, -- Team Id used to uniquely identify each team and to match with the standings table team id's 
-    s.Team, -- Team name
-    s.Rsh_TD, -- Rushing Touchdowns
-    s.Rec_TD, -- Receiving Touchdowns
-    s.Tot_TD, -- Total Touchdowns
-    s.'2-PT'  -- Successful 2-Point conversions
+    id AS team_id, -- Team Id used to uniquely identify each team and to match with the standings table team id's 
+    Team, -- Team name
+    Rsh_TD, -- Rushing Touchdowns
+    Rec_TD, -- Receiving Touchdowns
+    Tot_TD, -- Total Touchdowns
+    '2-PT'  -- Successful 2-Point conversions
 
 ### Example data from csv file for the web app:
 Team,Rushing_Touchdowns,Receiving_Touchdowns,Total_Touchdowns,Two_Point_Conversions,Wins,Losses,Ties
@@ -155,7 +157,38 @@ inner join team_scoring_2024
 on league_standings_2024.team_id = team_scoring_2024.id
 
 ## Web Application:
-The user selects an NFL team to see the related data.
+ 
+My application includes the following 6 visualizations to look at team scoring and record.
+The user selects an NFL team to see the related data on the first three graphs below.
+Graph 4 requires the user to select two teams for comparison. Graph 5 gives the user the option to highlight a selected team to use as a visual help. Graph 6 requires no user input.
+1. Individual Team Scoring Statistics (bar chart)
+ - Shows the selected team's scoring statistics and record in a bar chart
+2. Offensive Balance (pie chart)
+ - Shows the proportion of Rushing TDs vs Receiving TDs
+ - Includes percentages and raw numbers
+ - Shows if a team is more run biased or throw biased
+3. Team Profile (radar chart)
+ - Shows 5 dimensions on a pentagon:
+    - Wins
+    - Total TDs
+    - Rushing TDs
+    - Receiving TDs
+    - 2-Point Conversions
+ - Normalized to show relative performance
+ - Raw values displayed with labels
+4. Team Comparison (side-by-side bars)
+ - Two dropdowns to select any two teams
+ - Side-by-side bar charts comparing:
+    - Wins
+    - Rushing TDs
+    - Receiving TDs
+    - Total TDs
+    - 2-Point Conversions
+5. Scatter Plot (Wins vs Total TDs with highlighting)
+ - Shows all 32 teams plotted with Wins (x-axis) vs Total Touchdowns (y-axis)
+ - Visually demonstrates the correlation between scoring and winning
+6. Top 10 Teams (ranked visualization)
+ - Gives the top 10 teams based off of record through a ranking system and compares it to the total touchdowns rank 
 
 
 

@@ -241,12 +241,49 @@
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
+
+        .nav-links {
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: #f0f4ff;
+            border-radius: 8px;
+            border: 1px solid #667eea;
+        }
+
+        .nav-links a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 8px 16px;
+            margin: 0 10px;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .nav-links a:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .nav-links a:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🏈 NFL Team Scoring Analytics</h1>
         <p class="subtitle">2024 Regular Season Statistics</p>
+        
+        <!-- Navigation Links -->
+        <div class="nav-links">
+            <a href="#project-report">📄 Project Report</a>
+            <a href="https://github.com/danielgambone/Football_Analytics_Final" target="_blank">💻 GitHub Project</a>
+        </div>
         
         <div class="controls">
             <label for="teamSelect">Select Team:</label>
@@ -328,7 +365,7 @@
             <h3>Landing page</h3>
             <h4>Overview</h4>
             <p>I used the 2024 NFL regular season league standings statistics and the 2024 NFL team scoring statistics from the NFL website to create a web application that educates the user about a given team's success during the year with statistical proof. I hoped to show the correlation between team standings and scoring.</p>
-            <p><a href="https://github.com/danielgambone/Football_Analytics_Final" target="_blank" rel="noopener noreferrer">https://github.com/danielgambone/Football_Analytics_Final</a></p>
+            <p>Git Hub Repository:<br><a href="https://github.com/danielgambone/Football_Analytics_Final" target="_blank" rel="noopener noreferrer">https://github.com/danielgambone/Football_Analytics_Final</a></p>
 
             <h3>Web scraping</h3>
             <p>I scraped data from NFL.com because it is a trustworthy source and provided the correct tabular format of the data. The table was organized in the format I wanted. I used the following two websites:</p>
@@ -345,78 +382,138 @@
             <h4>Example HTTP request and parse step</h4>
             <pre><code>url = "https://www.nfl.com/standings/league/2024/REG"
 
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-}
-response = requests.get(url, headers=headers)
-response.raise_for_status()
-
-soup = BeautifulSoup(response.content, 'html.parser')
-table = soup.find('table')
-
-headers_row = table.find('thead')
-header_cells = headers_row.find_all('th')
-header_names = [cell.get_text(strip=True) for cell in header_cells]
-
-rows = table.find('tbody').find_all('tr')
-standings_data = []
-
-for row in rows:
-    cells = row.find_all('td')
-    if len(cells) == 0:
-        continue
-
-    team_cell = cells[0]
-    team_text = team_cell.get_text(strip=True)
-
-    words = team_text.split()
-    last_word = words[-1] if words else ""
-
-    if last_word:
-        team_name = ""
-        for j, char in enumerate(last_word):
-            if char.isupper():
-                if not team_name:
-                    team_name = char
-                else:
-                    team_name += char
-            elif char.isalpha() and team_name:
-                team_name += char
-            elif not char.isalpha() and team_name:
-                break
-
-        if team_name and len(team_name) > 2:
-            if len(team_name) % 2 == 0:
-                half_len = len(team_name) // 2
-                if team_name[:half_len].lower() == team_name[half_len:].lower():
-                    team_name = team_name[:half_len]
+try:
+    # Send HTTP request
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    
+    # Parse HTML content
+    soup = BeautifulSoup(response.content, 'html.parser')
+    
+    # Find the standings table
+    table = soup.find('table')
+    
+    if not table:
+        return "Error: Could not find the standings table on the page"
+    
+    # Extract headers to find the column indices
+    headers_row = table.find('thead')
+    if headers_row:
+        header_cells = headers_row.find_all('th')
+        header_names = [cell.get_text(strip=True) for cell in header_cells]
     else:
-        team_name = None
-
-    row_data = {'NFL_Team': team_name}
-    standings_data.append(row_data)</code></pre>
+        return "Error: Could not find table headers"
+    
+    # Find indices for required columns
+    column_indices = {}
+    for idx, header in enumerate(header_names):
+        header_lower = header.lower()
+        if 'team' in header_lower:
+            column_indices['NFL_Team'] = idx
+        elif header_lower == 'w':
+            column_indices['W'] = idx
+        elif header_lower == 'l':
+            column_indices['L'] = idx
+        elif header_lower == 't':
+            column_indices['T'] = idx
+    
+    # Extract table data
+    rows = table.find('tbody').find_all('tr')
+    standings_data = []
+    
+    for row in rows:
+        cells = row.find_all('td')
+        if len(cells) == 0:
+            continue
+        
+        # Extract team name
+        if cells:
+            team_cell = cells[0]
+            # Get text and clean it
+            team_text = team_cell.get_text(strip=True)
+            
+            # Extract team name from the last word, handling corrupted suffixes
+            words = team_text.split()
+            last_word = words[-1] if words else ""
+            
+            if last_word:
+                # Find the team name: start from first uppercase, continue collecting letters
+                # Stop when we encounter a sequence that looks like corruption (lowercase after the team name)
+                team_name = ""
+                for j, char in enumerate(last_word):
+                    if char.isupper():
+                        if not team_name:
+                            # Starting the team name
+                            team_name = char
+                        else:
+                            # Add uppercase letters
+                            team_name += char
+                    elif char.isalpha() and team_name:
+                        # Add lowercase only if it's right after uppercase (like "McD" in McDonald)
+                        # or if we've been building the name
+                        if len(team_name) > 0:
+                            team_name += char
+                    elif not char.isalpha() and team_name:
+                        # Hit non-letter, stop building
+                        break
+                
+                # Handle duplicated names like "BrownsBrowns" where the entire name appears twice
+                if team_name and len(team_name) > 2:
+                    # Check if it's a duplication (even length and first half = second half)
+                    if len(team_name) % 2 == 0:
+                        half_len = len(team_name) // 2
+                        if team_name[:half_len].lower() == team_name[half_len:].lower():
+                            team_name = team_name[:half_len]
+            else:
+                team_name = None
+        else:
+            team_name = None
+        
+        # Extract the required statistics
+        row_data = {'NFL_Team': team_name}
+        
+        for col_name, idx in column_indices.items():
+            if col_name != 'NFL_Team' and idx < len(cells):
+                value = cells[idx].get_text(strip=True)
+                # Handle missing values
+                if value in ['', '-', 'N/A', '--']:
+                    row_data[col_name] = 0
+                else:
+                    # Remove any non-numeric characters
+                    cleaned_value = re.sub(r'[^\d]', '', value)
+                    try:
+                        row_data[col_name] = int(cleaned_value) if cleaned_value else 0
+                    except ValueError:
+                        row_data[col_name] = 0
+            elif col_name != 'NFL_Team':
+                row_data[col_name] = 0
+        
+        standings_data.append(row_data)</code></pre>
 
             <h3>Database</h3>
             <p>I used the following tables and columns:</p>
             <ul>
                 <li><strong>league_standings_2024</strong> - Team standings for the 2024 NFL season (Team Name, Wins, Losses, Ties)
                     <ul>
-                        <li>ls.id -- auto generated primary key. Not needed in output.</li>
-                        <li>ls.team_id -- Team Id used to uniquely identify each team</li>
-                        <li>ls.NFL_Team -- Team name</li>
-                        <li>ls.W -- Wins</li>
-                        <li>ls.L -- Losses</li>
-                        <li>ls.T -- Ties</li>
+                        <li>id -- auto generated primary key. Not needed in output.</li>
+                        <li>team_id -- Team Id used to uniquely identify each team</li>
+                        <li>NFL_Team -- Team name</li>
+                        <li>W -- Wins</li>
+                        <li>L -- Losses</li>
+                        <li>T -- Ties</li>
                     </ul>
                 </li>
                 <li><strong>team_scoring_2024</strong> - Team scoring statistics for the 2024 NFL season (includes Rushing TDs, Receiving TDs, Total TDs, 2 Points Conversions)
                     <ul>
-                        <li>s.id AS team_id -- Team Id used to uniquely identify each team and to match with the standings table team ids</li>
-                        <li>s.Team -- Team name</li>
-                        <li>s.Rsh_TD -- Rushing Touchdowns</li>
-                        <li>s.Rec_TD -- Receiving Touchdowns</li>
-                        <li>s.Tot_TD -- Total Touchdowns</li>
-                        <li>s.'2-PT' -- Successful 2-Point conversions</li>
+                        <li>id AS team_id -- Team Id used to uniquely identify each team and to match with the standings table team ids</li>
+                        <li>Team -- Team name</li>
+                        <li>Rsh_TD -- Rushing Touchdowns</li>
+                        <li>Rec_TD -- Receiving Touchdowns</li>
+                        <li>Tot_TD -- Total Touchdowns</li>
+                        <li>'2-PT' -- Successful 2-Point conversions</li>
                     </ul>
                 </li>
             </ul>
@@ -432,7 +529,63 @@ inner join team_scoring_2024
 on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
 
             <h3>Web Application</h3>
-            <p>The user selects an NFL team to see the related data.</p>
+            <p>My application includes the following 6 visualizations to look at team scoring and record.
+            The user selects an NFL team to see the related data on the first three graphs below.
+            Graph 4 requires the user to select two teams for comparison. Graph 5 gives the user the option to highlight a selected team to use as a visual help. Graph 6 requires no user input.</p>
+            <ol>
+                <li><strong>Individual Team Scoring Statistics (bar chart)</strong>
+                    <ul>
+                        <li>Shows the selected team's scoring statistics and record in a bar chart</li>
+                    </ul>
+                </li>
+                <li><strong>Offensive Balance (pie chart)</strong>
+                    <ul>
+                        <li>Shows the proportion of Rushing TDs vs Receiving TDs</li>
+                        <li>Includes percentages and raw numbers</li>
+                        <li>Shows if a team is more run biased or throw biased</li>
+                    </ul>
+                </li>
+                <li><strong>Team Profile (radar chart)</strong>
+                    <ul>
+                        <li>Shows 5 dimensions on a pentagon:
+                            <ul>
+                                <li>Wins</li>
+                                <li>Total TDs</li>
+                                <li>Rushing TDs</li>
+                                <li>Receiving TDs</li>
+                                <li>2-Point Conversions</li>
+                            </ul>
+                        </li>
+                        <li>Normalized to show relative performance</li>
+                        <li>Raw values displayed with labels</li>
+                    </ul>
+                </li>
+                <li><strong>Team Comparison (side-by-side bars)</strong>
+                    <ul>
+                        <li>Two dropdowns to select any two teams</li>
+                        <li>Side-by-side bar charts comparing:
+                            <ul>
+                                <li>Wins</li>
+                                <li>Rushing TDs</li>
+                                <li>Receiving TDs</li>
+                                <li>Total TDs</li>
+                                <li>2-Point Conversions</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+                <li><strong>Scatter Plot (Wins vs Total TDs with highlighting)</strong>
+                    <ul>
+                        <li>Shows all 32 teams plotted with Wins (x-axis) vs Total Touchdowns (y-axis)</li>
+                        <li>Visually demonstrates the correlation between scoring and winning</li>
+                    </ul>
+                </li>
+                <li><strong>Top 10 Teams (ranked visualization)</strong>
+                    <ul>
+                        <li>Gives the top 10 teams based off of record through a ranking system and compares it to the total touchdowns rank</li>
+                    </ul>
+                </li>
+            </ol>
         </section>
     </div>
 
@@ -1227,520 +1380,4 @@ on league_standings_2024.team_id = team_scoring_2024.id</code></pre>
     </script>
 </body>
 </html>
-            const canvas = document.getElementById('pieChart');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = canvas.parentElement.clientWidth - 40;
-            canvas.height = 350;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2 - 20;
-            const radius = Math.min(centerX, centerY) - 40;
-
-            const rushing = teamData.rushingTouchdowns;
-            const receiving = teamData.receivingTouchdowns;
-            const total = rushing + receiving;
-
-            if (total === 0) return;
-
-            const rushingAngle = (rushing / total) * 2 * Math.PI;
-            const receivingAngle = (receiving / total) * 2 * Math.PI;
-
-            // Draw rushing slice
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, radius, 0, rushingAngle);
-            ctx.closePath();
-            ctx.fillStyle = '#667eea';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            // Draw receiving slice
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, radius, rushingAngle, rushingAngle + receivingAngle);
-            ctx.closePath();
-            ctx.fillStyle = '#f093fb';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 3;
-            ctx.stroke();
-
-            // Labels
-            ctx.font = 'bold 16px Arial';
-            ctx.fillStyle = '#fff';
-            ctx.textAlign = 'center';
-
-            const rushingLabelAngle = rushingAngle / 2;
-            const rushingLabelX = centerX + Math.cos(rushingLabelAngle) * (radius * 0.6);
-            const rushingLabelY = centerY + Math.sin(rushingLabelAngle) * (radius * 0.6);
-            ctx.fillText(`${rushing}`, rushingLabelX, rushingLabelY);
-
-            const receivingLabelAngle = rushingAngle + receivingAngle / 2;
-            const receivingLabelX = centerX + Math.cos(receivingLabelAngle) * (radius * 0.6);
-            const receivingLabelY = centerY + Math.sin(receivingLabelAngle) * (radius * 0.6);
-            ctx.fillText(`${receiving}`, receivingLabelX, receivingLabelY);
-
-            // Title
-            ctx.font = 'bold 20px Arial';
-            ctx.fillStyle = '#333';
-            ctx.fillText(`${teamData.team} - TD Breakdown`, centerX, 30);
-
-            // Legend
-            ctx.font = '14px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillStyle = '#667eea';
-            ctx.fillRect(centerX - 150, canvas.height - 40, 20, 20);
-            ctx.fillStyle = '#333';
-            ctx.fillText(`Rushing TDs: ${rushing} (${(rushing/total*100).toFixed(1)}%)`, centerX - 125, canvas.height - 25);
-
-            ctx.fillStyle = '#f093fb';
-            ctx.fillRect(centerX + 30, canvas.height - 40, 20, 20);
-            ctx.fillStyle = '#333';
-            ctx.fillText(`Receiving TDs: ${receiving} (${(receiving/total*100).toFixed(1)}%)`, centerX + 55, canvas.height - 25);
-        }
-
-        // Radar Chart - Team Profile
-        function renderRadarChart(teamData) {
-            const canvas = document.getElementById('radarChart');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = canvas.parentElement.clientWidth - 40;
-            canvas.height = 400;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const radius = Math.min(centerX, centerY) - 80;
-
-            // Normalize data to 0-1 scale
-            const maxWins = Math.max(...teamsData.map(t => t.wins));
-            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
-            const maxRushTDs = Math.max(...teamsData.map(t => t.rushingTouchdowns));
-            const maxRecTDs = Math.max(...teamsData.map(t => t.receivingTouchdowns));
-            const max2PT = Math.max(...teamsData.map(t => t.twoPointConversions));
-
-            const metrics = [
-                { label: 'Wins', value: teamData.wins / maxWins, raw: teamData.wins },
-                { label: 'Total TDs', value: teamData.totalTouchdowns / maxTDs, raw: teamData.totalTouchdowns },
-                { label: 'Rushing TDs', value: teamData.rushingTouchdowns / maxRushTDs, raw: teamData.rushingTouchdowns },
-                { label: 'Receiving TDs', value: teamData.receivingTouchdowns / maxRecTDs, raw: teamData.receivingTouchdowns },
-                { label: '2-PT Conv', value: teamData.twoPointConversions / (max2PT || 1), raw: teamData.twoPointConversions }
-            ];
-
-            const angleStep = (2 * Math.PI) / metrics.length;
-
-            // Draw grid circles
-            ctx.strokeStyle = '#e0e0e0';
-            ctx.lineWidth = 1;
-            for (let i = 1; i <= 5; i++) {
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, (radius / 5) * i, 0, 2 * Math.PI);
-                ctx.stroke();
-            }
-
-            // Draw axes
-            ctx.strokeStyle = '#ccc';
-            ctx.lineWidth = 1;
-            metrics.forEach((metric, i) => {
-                const angle = i * angleStep - Math.PI / 2;
-                const x = centerX + Math.cos(angle) * radius;
-                const y = centerY + Math.sin(angle) * radius;
-                ctx.beginPath();
-                ctx.moveTo(centerX, centerY);
-                ctx.lineTo(x, y);
-                ctx.stroke();
-
-                // Labels
-                ctx.font = '12px Arial';
-                ctx.fillStyle = '#333';
-                ctx.textAlign = 'center';
-                const labelX = centerX + Math.cos(angle) * (radius + 25);
-                const labelY = centerY + Math.sin(angle) * (radius + 25);
-                ctx.fillText(metric.label, labelX, labelY);
-                ctx.fillText(`(${metric.raw})`, labelX, labelY + 15);
-            });
-
-            // Draw data polygon
-            ctx.beginPath();
-            metrics.forEach((metric, i) => {
-                const angle = i * angleStep - Math.PI / 2;
-                const distance = metric.value * radius;
-                const x = centerX + Math.cos(angle) * distance;
-                const y = centerY + Math.sin(angle) * distance;
-                if (i === 0) {
-                    ctx.moveTo(x, y);
-                } else {
-                    ctx.lineTo(x, y);
-                }
-            });
-            ctx.closePath();
-            ctx.fillStyle = 'rgba(102, 126, 234, 0.3)';
-            ctx.fill();
-            ctx.strokeStyle = '#667eea';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            // Draw points
-            metrics.forEach((metric, i) => {
-                const angle = i * angleStep - Math.PI / 2;
-                const distance = metric.value * radius;
-                const x = centerX + Math.cos(angle) * distance;
-                const y = centerY + Math.sin(angle) * distance;
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, 2 * Math.PI);
-                ctx.fillStyle = '#667eea';
-                ctx.fill();
-            });
-
-            // Title
-            ctx.font = 'bold 18px Arial';
-            ctx.fillStyle = '#333';
-            ctx.textAlign = 'center';
-            ctx.fillText(`${teamData.team} Performance Profile`, centerX, 25);
-        }
-
-        // Team Comparison
-        function updateComparison() {
-            const team1Name = document.getElementById('team1Select').value;
-            const team2Name = document.getElementById('team2Select').value;
-
-            if (!team1Name || !team2Name) return;
-
-            const team1 = teamsData.find(t => t.team === team1Name);
-            const team2 = teamsData.find(t => t.team === team2Name);
-
-            if (!team1 || !team2) return;
-
-            renderComparisonChart(team1, team2);
-        }
-
-        function renderComparisonChart(team1, team2) {
-            const canvas = document.getElementById('comparisonChart');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = canvas.parentElement.clientWidth - 40;
-            canvas.height = 400;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const metrics = [
-                { label: 'Wins', key: 'wins' },
-                { label: 'Rushing TDs', key: 'rushingTouchdowns' },
-                { label: 'Receiving TDs', key: 'receivingTouchdowns' },
-                { label: 'Total TDs', key: 'totalTouchdowns' },
-                { label: '2-PT Conv', key: 'twoPointConversions' }
-            ];
-
-            const padding = 80;
-            const chartWidth = canvas.width - padding * 2;
-            const chartHeight = canvas.height - padding * 1.5;
-            const groupWidth = chartWidth / metrics.length;
-            const barWidth = groupWidth / 2.8;
-
-            // Find max value for scaling
-            const maxValue = Math.max(
-                ...metrics.map(m => Math.max(team1[m.key], team2[m.key]))
-            );
-
-            // Title
-            ctx.font = 'bold 18px Arial';
-            ctx.fillStyle = '#333';
-            ctx.textAlign = 'center';
-            ctx.fillText(`${team1.team} vs ${team2.team}`, canvas.width / 2, 25);
-
-            // Axes
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(padding, padding);
-            ctx.lineTo(padding, canvas.height - padding);
-            ctx.lineTo(canvas.width - padding, canvas.height - padding);
-            ctx.stroke();
-
-            // Draw bars
-            metrics.forEach((metric, i) => {
-                const baseX = padding + i * groupWidth;
-                const team1Value = team1[metric.key];
-                const team2Value = team2[metric.key];
-                
-                const team1Height = (team1Value / maxValue) * (chartHeight * 0.9);
-                const team2Height = (team2Value / maxValue) * (chartHeight * 0.9);
-
-                const team1X = baseX + groupWidth * 0.2;
-                const team2X = team1X + barWidth + 8;
-
-                const team1Y = canvas.height - padding - team1Height;
-                const team2Y = canvas.height - padding - team2Height;
-
-                // Team 1 bar
-                ctx.fillStyle = '#667eea';
-                ctx.fillRect(team1X, team1Y, barWidth, team1Height);
-                ctx.fillStyle = '#222';
-                ctx.font = '11px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(team1Value, team1X + barWidth / 2, team1Y - 6);
-
-                // Team 2 bar
-                ctx.fillStyle = '#f093fb';
-                ctx.fillRect(team2X, team2Y, barWidth, team2Height);
-                ctx.fillStyle = '#222';
-                ctx.fillText(team2Value, team2X + barWidth / 2, team2Y - 6);
-
-                // Metric label
-                ctx.save();
-                ctx.translate(baseX + groupWidth / 2, canvas.height - padding + 20);
-                ctx.rotate(-Math.PI / 6);
-                ctx.textAlign = 'right';
-                ctx.fillStyle = '#444';
-                ctx.font = '12px Arial';
-                ctx.fillText(metric.label, 0, 0);
-                ctx.restore();
-            });
-
-            // Y-axis labels
-            ctx.fillStyle = '#666';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'right';
-            for (let i = 0; i <= 5; i++) {
-                const value = Math.round((maxValue / 5) * i);
-                const y = canvas.height - padding - (chartHeight * 0.9 * i / 5);
-                ctx.fillText(value, padding - 10, y + 4);
-                
-                ctx.strokeStyle = '#e0e0e0';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(padding, y);
-                ctx.lineTo(canvas.width - padding, y);
-                ctx.stroke();
-            }
-
-            // Legend
-            ctx.font = '14px Arial';
-            ctx.fillStyle = '#667eea';
-            ctx.fillRect(canvas.width / 2 - 100, canvas.height - 25, 20, 15);
-            ctx.fillStyle = '#333';
-            ctx.textAlign = 'left';
-            ctx.fillText(team1.team, canvas.width / 2 - 75, canvas.height - 13);
-
-        // Scatter Plot - Wins vs TDs
-        function renderScatterPlot() {
-            if (!teamsData || teamsData.length === 0) return;
-            
-            const canvas = document.getElementById('scatterChart');
-            if (!canvas) return;
-            
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = canvas.parentElement.clientWidth - 40;
-            canvas.height = 450;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            const padding = 70;
-            const chartWidth = canvas.width - padding * 2;
-            const chartHeight = canvas.height - padding * 1.5;
-
-            const maxWins = Math.max(...teamsData.map(t => t.wins));
-            const maxTDs = Math.max(...teamsData.map(t => t.totalTouchdowns));
-            
-            const scatterSelect = document.getElementById('scatterTeamSelect');
-            const highlightTeam = scatterSelect ? scatterSelect.value : '';
-
-            // Title
-            ctx.font = 'bold 18px Arial';
-            ctx.fillStyle = '#333';
-            ctx.textAlign = 'center';
-            ctx.fillText('League-Wide: Wins vs Total Touchdowns', canvas.width / 2, 25);
-
-            // Axes
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(padding, padding);
-            ctx.lineTo(padding, canvas.height - padding);
-            ctx.lineTo(canvas.width - padding, canvas.height - padding);
-            ctx.stroke();
-
-            // Grid lines
-            ctx.strokeStyle = '#e0e0e0';
-            ctx.lineWidth = 1;
-            for (let i = 0; i <= 5; i++) {
-                const y = canvas.height - padding - (chartHeight * i / 5);
-                ctx.beginPath();
-                ctx.moveTo(padding, y);
-                ctx.lineTo(canvas.width - padding, y);
-                ctx.stroke();
-
-                const x = padding + (chartWidth * i / 5);
-                ctx.beginPath();
-                ctx.moveTo(x, padding);
-                ctx.lineTo(x, canvas.height - padding);
-                ctx.stroke();
-            }
-
-            // Plot points (non-highlighted first, then highlighted on top)
-            const sortedTeams = [...teamsData].sort((a, b) => {
-                if (a.team === highlightTeam) return 1;
-                if (b.team === highlightTeam) return -1;
-                return 0;
-            });
-
-            sortedTeams.forEach(team => {
-                const x = padding + (team.wins / maxWins) * chartWidth;
-                const y = canvas.height - padding - (team.totalTouchdowns / maxTDs) * chartHeight;
-                const isHighlighted = team.team === highlightTeam;
-
-                ctx.beginPath();
-                ctx.arc(x, y, isHighlighted ? 9 : 6, 0, 2 * Math.PI);
-                
-                if (isHighlighted) {
-                    ctx.fillStyle = '#FFD700'; // Gold/Yellow
-                    ctx.fill();
-                    ctx.strokeStyle = '#FF8C00'; // Dark orange border
-                    ctx.lineWidth = 3;
-                    ctx.stroke();
-                    
-                    // Add glow effect
-                    ctx.beginPath();
-                    ctx.arc(x, y, 13, 0, 2 * Math.PI);
-                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
-                    ctx.lineWidth = 6;
-                    ctx.stroke();
-                } else {
-                    ctx.fillStyle = 'rgba(102, 126, 234, 0.7)';
-                    ctx.fill();
-                    ctx.strokeStyle = '#667eea';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                }
-
-                // Team label
-                ctx.font = isHighlighted ? 'bold 11px Arial' : '10px Arial';
-                ctx.fillStyle = isHighlighted ? '#FF8C00' : '#333';
-                ctx.textAlign = 'center';
-                ctx.fillText(team.team, x, y - (isHighlighted ? 14 : 10));
-            });
-
-            // Axis labels
-            ctx.font = '14px Arial';
-            ctx.fillStyle = '#333';
-            ctx.textAlign = 'center';
-            ctx.fillText('Wins →', canvas.width / 2, canvas.height - 15);
-            
-            ctx.save();
-            ctx.translate(20, canvas.height / 2);
-            ctx.rotate(-Math.PI / 2);
-            ctx.fillText('Total Touchdowns →', 0, 0);
-            ctx.restore();
-
-            // X-axis values
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            for (let i = 0; i <= 5; i++) {
-                const value = Math.round((maxWins / 5) * i);
-                const x = padding + (chartWidth * i / 5);
-                ctx.fillText(value, x, canvas.height - padding + 20);
-            }
-
-            // Y-axis values
-            ctx.textAlign = 'right';
-            for (let i = 0; i <= 5; i++) {
-                const value = Math.round((maxTDs / 5) * i);
-                const y = canvas.height - padding - (chartHeight * i / 5);
-                ctx.fillText(value, padding - 10, y + 4);
-            }
-        }
-
-        // Render grouped bars for Top 10 teams (Wins and Total TDs with ranks)
-        function renderTop10Chart() {
-            if (!top10Data.length) return;
-            const canvas = document.getElementById('top10Chart');
-            const ctx = canvas.getContext('2d');
-
-            canvas.width = canvas.parentElement.clientWidth - 40;
-            canvas.height = 360;
-
-            const ordered = [...top10Data].sort((a, b) => {
-                if (a.winRank === b.winRank) return a.tdRank - b.tdRank;
-                return a.winRank - b.winRank;
-            });
-
-            const padding = 70;
-            const chartWidth = canvas.width - padding * 2;
-            const chartHeight = canvas.height - padding * 1.3;
-            const groupWidth = chartWidth / ordered.length;
-            const barWidth = groupWidth / 2.4;
-            const maxValue = Math.max(
-                ...ordered.map(t => Math.max(t.wins, t.totalTouchdowns))
-            );
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // axes
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(padding, padding * 0.6);
-            ctx.lineTo(padding, canvas.height - padding);
-            ctx.lineTo(canvas.width - padding, canvas.height - padding);
-            ctx.stroke();
-
-            ordered.forEach((team, i) => {
-                const baseX = padding + i * groupWidth;
-                const winsHeight = (team.wins / maxValue) * (chartHeight * 0.9);
-                const tdHeight = (team.totalTouchdowns / maxValue) * (chartHeight * 0.9);
-                const winsX = baseX + groupWidth * 0.15;
-                const tdX = winsX + barWidth + 6;
-                const winsY = canvas.height - padding - winsHeight;
-                const tdY = canvas.height - padding - tdHeight;
-
-                // Wins bar
-                ctx.fillStyle = '#667eea';
-                ctx.fillRect(winsX, winsY, barWidth, winsHeight);
-                ctx.fillStyle = '#1f1f1f';
-                ctx.font = '11px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(`${team.wins} (R${team.winRank})`, winsX + barWidth / 2, winsY - 6);
-
-                // Total TD bar
-                ctx.fillStyle = '#f093fb';
-                ctx.fillRect(tdX, tdY, barWidth, tdHeight);
-                ctx.fillStyle = '#1f1f1f';
-                ctx.fillText(`${team.totalTouchdowns} (R${team.tdRank})`, tdX + barWidth / 2, tdY - 6);
-
-                // Team label
-                ctx.save();
-                ctx.translate(baseX + groupWidth / 2, canvas.height - padding + 22);
-                ctx.rotate(-Math.PI / 6);
-                ctx.textAlign = 'right';
-                ctx.fillStyle = '#444';
-                ctx.font = '12px Arial';
-                ctx.fillText(team.team, 0, 0);
-                ctx.restore();
-            });
-
-            // y-axis labels + grid
-            ctx.fillStyle = '#666';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'right';
-            for (let i = 0; i <= 5; i++) {
-                const value = Math.round((maxValue / 5) * i);
-                const y = canvas.height - padding - (chartHeight * 0.9 * i / 5);
-                ctx.fillText(value, padding - 10, y + 4);
-                ctx.strokeStyle = '#e0e0e0';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(padding, y);
-                ctx.lineTo(canvas.width - padding, y);
-                ctx.stroke();
-            }
-        }
-    </script>
-</body>
-</html>
+       

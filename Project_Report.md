@@ -2,7 +2,7 @@
 ## Overview: 
 I used the 2024 NFL regular season league standings statistics and the 2024 NFL team scoring statistics from the NFL website to create a web application that educates the user about a given team's success during the year with statistical proof. I hoped to show the correlation between team standings and scoring.
 
-Git Hub Project:
+Git Hub Repository:
 https://github.com/danielgambone/Football_Analytics_Final
 
 ## Web scraping:
